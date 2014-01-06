@@ -1,0 +1,334 @@
+#!/bin/sh
+#
+# $Id: archivi_sync,v 1.9 2013/11/17 22:05:28 tnx Exp $
+#
+
+APP_NAME=`basename $0 .sh | sed 's/.*\///'`
+LOG_ROOT='/var/log/archivi_sync'
+BACKUP_ROOT='/home/archivi.sync_backup'
+WORK_HOST='fe11.nellinux.net'
+PRIVATE_HOST='k.nellinux.net'
+DISK_ID='0bc2:2332'
+DISK_MOUNT='/mnt/seagate'
+DISK_DEV='/dev/seagate'
+MAPNAME='cryptoseagate'
+
+log(){
+    echo "[$APP_NAME `date +%T`] $1"
+    logger $1 -t $APP_NAME
+}
+
+
+version() {
+  v=$(cat $0 | sed -n /^#.*Id:/p )
+  echo $v | sed  's/.*Id://'
+}
+
+
+usage() {
+cat <<EOF
+NOME: $APP_NAME
+
+SINOSSI: $APP_NAME [OPZIONI] COMANDO
+
+DESCRIZIONE:
+     Il programma $APP_NAME sincronizza il calcolatore privato ed il
+     calcolatore di ufficio.  I backup sono negli oggetti $BACKUP_ROOT
+     dei due calcolatori; i log sono nell'ggetto $LOG_ROOT del
+     calcolatore su cui si esegue il programma.
+
+COMANDI:
+     work-to-disk    :  eseguito nell'host privato sincronizza con un disco esterno
+     private-to-disk :  eseguito nell'host di ufficio sincronizza con un disco esterno
+     work-to-private :  eseguito nell'host di ufficio sincronizza P2P i due host
+
+     mount  : monta il dispositivo cifrato
+     remove : smonta la partizione e rimuove il device-mapper
+
+OPZIONI:
+     -f  forza elaborazione anche su una macchina diversa da $PRIVILEGED_ORIGIN_HOST
+     -n  dry run
+     -h  questo help
+     -V  stampa le informazioni di versione del programma
+
+POLICY SINCRONIZZAZIONE:
+    tbd
+
+EOF
+  exit 1
+}
+
+work_in_progress() {
+cat <<EOF
+$(basename $0)
+Questa funzionalita' non e' disponibile :-)
+EOF
+
+}
+
+#### MAIN ###
+
+EXIT_SUCCESS=0
+NOOP=0
+INVALID_EXECUTION_HOST=1
+FUNCTION_TO_BE_DEFINED=2
+DISK_NOT_AVAILABLE=3
+
+
+#
+# Gestione dei parametri e delle opzioni
+#
+while getopts ":nhV" option; do
+  case $option in
+      n)  DRY_RUN='--dry-run'
+          ;;
+      h)  usage
+          exit $EXIT_SUCCESS
+          ;;
+      V)  version
+          exit $EXIT_SUCCESS
+          ;;
+  esac
+done
+
+shift $(($OPTIND - 1))
+
+#
+# Variabili di modulo
+#
+
+host=`cat /etc/HOSTNAME`
+ts=`date +%Y%m%d%H%M%S`
+
+#
+# Funzioni che devono stre qui in quanto hanno bisogno di accedere ai
+# valori di alcune variabili di modulo e costanti.
+#
+
+additional_notice() {
+    if [ "$DRY_RUN" != "--dry-run" ]; then
+        cat <<EOF
+I backup dei file cancellati sono in $BACKUP_ROOT e $PRIVATE_HOST:$BACKUP_ROOT.
+I log si trovano in $LOG_ROOT.
+EOF
+    fi
+}
+
+work_to_private() {
+
+    #------------------------------------------------------------------#
+    #                                                                  #
+    # Con questa elaborazione  si sincronizzano gli oggetti tra i due  #
+    # calcolatori collegati tramite rete;  il programm va eseguito nel #
+    # calcolatore dell'ufficio (es. fe11).                             #
+    #                                                                  #
+    #------------------------------------------------------------------#
+
+    #
+    # Controllo prerequisiti
+    #
+
+    # Posizione di backup locale
+    if [ ! -w "$BACKUP_ROOT" ]; then
+        echo "La posizione $BACKUP_ROOT non e' disponibile per la scrittura.  Elaborazione interrotta."
+        echo "# su -c " "'" "mkdir $BACKUP_ROOT" "&& chown tnx $BACKUP_ROOT'"
+        exit -1
+    fi
+    # Posizione di backup remota
+    if ! ssh $PRIVATE_HOST "test -w $BACKUP_ROOT"; then
+        echo "La posizione $PRIVATE_HOST:$BACKUP_ROOT non e' disponibile per la scrittura.  Elaborazione interrotta."
+        echo "# ssh root@$PRIVATE_HOST 'mkdir $BACKUP_ROOT && chown tnx $BACKUP_ROOT'"
+        exit -2
+    fi
+    # Posizione log
+    if [ ! -w "$LOG_ROOT" ]; then
+        echo "La posizione $LOG_ROOT non e' disponibile per la scrittura.  Elaborazione interrotta."
+        echo "# su -c " "'" "mkdir $LOG_ROOT" "&& chown tnx $LOG_ROOT'"
+        exit -3
+    fi
+
+    #
+    # Trasferimenti
+    #
+
+    repository='/home/archivi/office/'
+    backup_dir="$BACKUP_ROOT/$ts/office/"
+    log_file="$LOG_ROOT/$ts.office"
+    echo
+    echo "Trasferimento $repository da locale a $PRIVATE_HOST ($ts)"
+    rsync $DRY_RUN  --itemize-changes --log-file=$log_file --backup --backup-dir=$backup_dir ---delete  --archive $repository  $PRIVATE_HOST:$repository
+
+    repository='/home/archivi/home/'
+    backup_dir="$BACKUP_ROOT/$ts/home/"
+    log_file="$LOG_ROOT/$ts.home"
+    echo
+    echo "Trasferimento $repository da $PRIVATE_HOST a locale ($ts)"
+    rsync $DRY_RUN --itemize-changes --log-file=$log_file --backup --backup-dir=$backup_dir ---delete  --archive $PRIVATE_HOST:$repository  $repository
+
+    repository='/home/archivi/share/'
+    log_file="$LOG_ROOT/$ts.share"
+    echo
+    echo "Trasferimento $repository ($ts)"
+    rsync $DRY_RUN --backup --itemize-changes --log-file=$log_file --archive --verbose $repository   $PRIVATE_HOST:$repository
+    rsync $DRY_RUN --backup --itemize-changes --log-file=$log_file --archive --verbose $PRIVATE_HOST:$repository   $repository
+
+    additional_notice
+}
+
+work_to_disk() {
+
+    echo "A minimal implementation !! The bigger is coming ... :-)"
+
+    # Aggiornamento tramite HOST LAVORO collegato a disco
+    #
+    # Policy:
+    #
+    #   - SHARED objects:   HOST <--> USB   (no delete)
+    #
+    #   - WORK archive:  HOST ---> USB   (delete)
+    #
+    #   - PRIVATE archive:      USB ---> HOST  (delete)
+    #
+
+    rsync -av $DRY_RUN /home/archivi/share/  /mnt/seagate/archivi/share/
+
+    rsync -av $DRY_RUN /mnt/seagate/archivi/share/  /home/archivi/share/
+
+    rsync -av --delete $DRY_RUN  /home/archivi/office/  /mnt/seagate/archivi/office/
+
+    rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/home/      /home/archivi/home/
+
+}
+
+
+private_to_disk() {
+
+    echo "A minimal implementation !! The bigger is coming ... :-)"
+
+    # Aggiornamento tramite HOST PRIVATO collegato a disco
+    #
+    # Policy:
+    #
+    #   - SHARED objects:   HOST <--> USB   (no delete)
+    #
+    #   - PRIVATE archive:  HOST ---> USB   (delete)
+    #
+    #   - WORK archive:      USB ---> HOST  (delete)
+    #
+
+    rsync -av $DRY_RUN /home/archivi/share/  /mnt/seagate/archivi/share/
+
+    rsync -av $DRY_RUN /mnt/seagate/archivi/share/  /home/archivi/share/
+
+    rsync -av --delete $DRY_RUN  /home/archivi/home/      /mnt/seagate/archivi/home/
+
+    rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/office/  /home/archivi/office/
+
+}
+
+
+mount_disk() {
+    if lsusb | grep $DISK_ID; then
+        if mount | grep $DISK_MOUNT;then
+            return 0
+        else
+            cryptsetup -d /etc/enc-key create $MAPNAME $DISK_DEV && mount $DISK_MOUNT
+        fi
+    else
+        echo "Il disco non e' collegato"
+        return $DISK_NOT_AVAILABLE
+    fi
+}
+
+remove_disk() {
+    if mount | grep $DISK_MOUNT;then
+        umount $DISK_MOUNT && cryptsetup remove $MAPNAME
+    fi
+}
+
+#
+#
+#  INSERIRE I CONTROLLI SULLA DISPONIBILITA' DEGLI OGGETT IDI SISTEMA
+#
+#  (/mnt/seagate, etc...)
+#
+#
+
+
+#
+# Ciclo dei comandi
+#
+cmd=$1
+case $cmd in
+
+    #
+    # Eseguito su host di lavoro, collegato in rete con host privato.
+    #
+    work-to-private)
+
+        if [ "$host" == "$WORK_HOST" ]; then
+            if ping $PRIVATE_HOST -c2; then
+                work_to_private
+                exit $EXIT_SUCCESS
+            else
+                echo "Host $PRIVATE_HOST non raggiungibile;  elaborazione annullata."
+            fi
+        else
+            echo "Questo comando dev'essere eseguito in $WORK_HOST; elaborazione annullata."
+            exit $INVALID_EXECUTION_HOST
+        fi
+        ;;
+
+    #
+    # Eseguito su host di lavoro, collegato in USB con disco esterno.
+    #
+    work-to-disk)
+
+        if [ "$host" == "$WORK_HOST" ]; then
+            if mount_disk ; then
+                work_to_disk
+                exit $EXIT_SUCCESS
+            else
+                echo "Disco esterno non raggiungibile;  elaborazione annullata."
+            fi
+        else
+            echo "Questo comando dev'essere eseguito in $WORK_HOST; elaborazione annullata."
+            exit $INVALID_EXECUTION_HOST
+        fi
+        ;;
+
+
+    #
+    # Eseguito su host privato, collegato in USB con disco esterno.
+    #
+    private-to-disk)
+        if [ "$host" == "$PRIVATE_HOST" ]; then
+            if mount_disk ; then
+                private_to_disk
+                exit $EXIT_SUCCESS
+            else
+                echo "Disco esterno non raggiungibile;  elaborazione annullata."
+            fi
+        else
+            echo "Questo comando dev'essere eseguito in $PRIVATE_HOST; elaborazione annullata."
+            exit $INVALID_EXECUTION_HOST
+        fi
+        ;;
+
+    #
+    # Gestione dispositivo
+    #
+    mount)
+        mount_disk
+        echo $DISK_MOUNT
+        ;;
+
+    remove)
+        remove_disk
+        ;;
+
+
+    *) usage
+        exit $EXIT_SUCCESS
+        ;;
+esac
