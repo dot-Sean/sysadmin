@@ -5,6 +5,8 @@
 # nellinux@rocketmail.com
 #
 
+ntpserver=`grep '^server' /etc/ntp.conf | tail -n1 | tr -s ' ' | cut -f2 -d' '`
+bigoffset=15
 
 start_ntpd() {
     echo 'Starting ntpd ...'
@@ -16,15 +18,15 @@ start_ntpd() {
 update_clock() {
     echo 'Updating clock ...'
     ps -C ntpd > /dev/null && /etc/rc.d/rc.ntpd stop
-    ntpdate ntp.dipvvf.it
+    ntpdate $ntpserver
     /etc/rc.d/rc.ntpd start
 }
 
 if ps -C ntpd > /dev/null ; then
     echo 'ntpd ok'
-    offset=$(ntpq -p | grep '10.251' | tr -s ' ' | cut -d' ' -f10 | sed 's/\..*//')
+    offset=$(ntpq -p | tail -n1 | tr -s ' ' | cut -d' ' -f9 | sed 's/\..*//')
     echo "Offset is $offset"
-    if [ $offset -gt 10 ]; then
+    if [ $offset -gt $bigoffset ]; then
         echo 'Too big !!'
         update_clock
     fi
