@@ -8,6 +8,16 @@
 ntpserver=`grep '^server' /etc/ntp.conf | tail -n1 | tr -s ' ' | cut -f2 -d' '`
 bigoffset=15
 
+APP_NAME=($basename $0)
+EXIT_SUCCESS=0
+NOOP=0
+
+log() {
+    echo "[$APP_NAME `date +%T`] $1"
+    logger $1 -t $APP_NAME
+}
+
+
 start_ntpd() {
     echo 'Starting ntpd ...'
     /etc/rc.d/rc.ntpd start
@@ -22,9 +32,42 @@ update_clock() {
     /etc/rc.d/rc.ntpd start
 }
 
+usage() {
+cat <<EOF
+  USAGE:
+    $(basename $0) [OPTIONS]
+
+  OPTIONS:
+     -f    force system time from $ntpserver
+     -h    this help
+EOF
+}
+
+
+
+###############################################################################
+# MAIN                                                                        #
+###############################################################################
+
+while getopts ":hf" option; do
+  case $option in
+
+      f)  update_clock
+          exit $EXIT_SUCCESS
+          ;;
+
+      h)  usage
+          exit $EXIT_SUCCESS
+          ;;
+  esac
+done
+
+shift $(($OPTIND - 1))
+
+
 if ps -C ntpd > /dev/null ; then
     echo 'ntpd ok'
-    offset=$(ntpq -p | tail -n1 | tr -s ' ' | cut -d' ' -f9 | sed 's/\..*//')
+    offset=$(ntpq -p | tail -n1 | sed 's/^[ *]//' | tr -s ' ' | cut -d' ' -f9 | sed 's/\..*//')
     echo "Offset is $offset"
     if [ $offset -gt $bigoffset ]; then
         echo 'Too big !!'
