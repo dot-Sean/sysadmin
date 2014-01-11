@@ -214,9 +214,8 @@ private_to_disk() {
     #   - WORK archive:      USB ---> HOST  (delete)
     #
 
-    rsync -av $DRY_RUN /home/archivi/share/  /mnt/seagate/archivi/share/
-
-    rsync -av $DRY_RUN /mnt/seagate/archivi/share/  /home/archivi/share/
+    rsync -av $DRY_RUN /mnt/seagate/archivi/share/  /home/archivi/share.in/ && \
+        rsync -av $DRY_RUN --delete /home/archivi/share.out/  /mnt/seagate/archivi/share/
 
     rsync -av --delete $DRY_RUN  /home/archivi/home/      /mnt/seagate/archivi/home/
 
