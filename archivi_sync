@@ -6,7 +6,7 @@
 APP_NAME=`basename $0 .sh | sed 's/.*\///'`
 LOG_ROOT='/var/log/archivi_sync'
 BACKUP_ROOT='/home/archivi.sync_backup'
-WORK_HOST='fe11.nellinux.net'
+WORK_HOST='ls0001.direzione.lombardia.dipvvf.it'
 PRIVATE_HOST='k.nellinux.net'
 DISK_ID='0bc2:2332'
 DISK_MOUNT='/mnt/seagate'
@@ -38,15 +38,13 @@ DESCRIZIONE:
      calcolatore su cui si esegue il programma.
 
 COMANDI:
-     work-to-disk    :  eseguito nell'host privato sincronizza con un disco esterno
-     private-to-disk :  eseguito nell'host di ufficio sincronizza con un disco esterno
-     work-to-private :  eseguito nell'host di ufficio sincronizza P2P i due host
+     work-to-disk    :  eseguito nell'host di ufficio sincronizza con un disco esterno
+     private-to-disk :  eseguito nell'host privato sincronizza con un disco esterno
 
      mount  : monta il dispositivo cifrato
      remove : smonta la partizione e rimuove il device-mapper
 
 OPZIONI:
-     -f  forza elaborazione anche su una macchina diversa da $PRIVILEGED_ORIGIN_HOST
      -n  dry run
      -h  questo help
      -V  stampa le informazioni di versione del programma
@@ -114,66 +112,66 @@ EOF
     fi
 }
 
-work_to_private() {
+# work_to_private() {
 
-    #------------------------------------------------------------------#
-    #                                                                  #
-    # Con questa elaborazione  si sincronizzano gli oggetti tra i due  #
-    # calcolatori collegati tramite rete;  il programm va eseguito nel #
-    # calcolatore dell'ufficio (es. fe11).                             #
-    #                                                                  #
-    #------------------------------------------------------------------#
+#     #------------------------------------------------------------------#
+#     #                                                                  #
+#     # Con questa elaborazione  si sincronizzano gli oggetti tra i due  #
+#     # calcolatori collegati tramite rete;  il programm va eseguito nel #
+#     # calcolatore dell'ufficio (es. ls001).                             #
+#     #                                                                  #
+#     #------------------------------------------------------------------#
 
-    #
-    # Controllo prerequisiti
-    #
+#     #
+#     # Controllo prerequisiti
+#     #
 
-    # Posizione di backup locale
-    if [ ! -w "$BACKUP_ROOT" ]; then
-        echo "La posizione $BACKUP_ROOT non e' disponibile per la scrittura.  Elaborazione interrotta."
-        echo "# su -c " "'" "mkdir $BACKUP_ROOT" "&& chown tnx $BACKUP_ROOT'"
-        exit -1
-    fi
-    # Posizione di backup remota
-    if ! ssh $PRIVATE_HOST "test -w $BACKUP_ROOT"; then
-        echo "La posizione $PRIVATE_HOST:$BACKUP_ROOT non e' disponibile per la scrittura.  Elaborazione interrotta."
-        echo "# ssh root@$PRIVATE_HOST 'mkdir $BACKUP_ROOT && chown tnx $BACKUP_ROOT'"
-        exit -2
-    fi
-    # Posizione log
-    if [ ! -w "$LOG_ROOT" ]; then
-        echo "La posizione $LOG_ROOT non e' disponibile per la scrittura.  Elaborazione interrotta."
-        echo "# su -c " "'" "mkdir $LOG_ROOT" "&& chown tnx $LOG_ROOT'"
-        exit -3
-    fi
+#     # Posizione di backup locale
+#     if [ ! -w "$BACKUP_ROOT" ]; then
+#         echo "La posizione $BACKUP_ROOT non e' disponibile per la scrittura.  Elaborazione interrotta."
+#         echo "# su -c " "'" "mkdir $BACKUP_ROOT" "&& chown tnx $BACKUP_ROOT'"
+#         exit -1
+#     fi
+#     # Posizione di backup remota
+#     if ! ssh $PRIVATE_HOST "test -w $BACKUP_ROOT"; then
+#         echo "La posizione $PRIVATE_HOST:$BACKUP_ROOT non e' disponibile per la scrittura.  Elaborazione interrotta."
+#         echo "# ssh root@$PRIVATE_HOST 'mkdir $BACKUP_ROOT && chown tnx $BACKUP_ROOT'"
+#         exit -2
+#     fi
+#     # Posizione log
+#     if [ ! -w "$LOG_ROOT" ]; then
+#         echo "La posizione $LOG_ROOT non e' disponibile per la scrittura.  Elaborazione interrotta."
+#         echo "# su -c " "'" "mkdir $LOG_ROOT" "&& chown tnx $LOG_ROOT'"
+#         exit -3
+#     fi
 
-    #
-    # Trasferimenti
-    #
+#     #
+#     # Trasferimenti
+#     #
 
-    repository='/home/archivi/office/'
-    backup_dir="$BACKUP_ROOT/$ts/office/"
-    log_file="$LOG_ROOT/$ts.office"
-    echo
-    echo "Trasferimento $repository da locale a $PRIVATE_HOST ($ts)"
-    rsync $DRY_RUN  --itemize-changes --log-file=$log_file --backup --backup-dir=$backup_dir ---delete  --archive $repository  $PRIVATE_HOST:$repository
+#     repository='/home/archivi/office/'
+#     backup_dir="$BACKUP_ROOT/$ts/office/"
+#     log_file="$LOG_ROOT/$ts.office"
+#     echo
+#     echo "Trasferimento $repository da locale a $PRIVATE_HOST ($ts)"
+#     rsync $DRY_RUN  --itemize-changes --log-file=$log_file --backup --backup-dir=$backup_dir ---delete  --archive $repository  $PRIVATE_HOST:$repository
 
-    repository='/home/archivi/home/'
-    backup_dir="$BACKUP_ROOT/$ts/home/"
-    log_file="$LOG_ROOT/$ts.home"
-    echo
-    echo "Trasferimento $repository da $PRIVATE_HOST a locale ($ts)"
-    rsync $DRY_RUN --itemize-changes --log-file=$log_file --backup --backup-dir=$backup_dir ---delete  --archive $PRIVATE_HOST:$repository  $repository
+#     repository='/home/archivi/home/'
+#     backup_dir="$BACKUP_ROOT/$ts/home/"
+#     log_file="$LOG_ROOT/$ts.home"
+#     echo
+#     echo "Trasferimento $repository da $PRIVATE_HOST a locale ($ts)"
+#     rsync $DRY_RUN --itemize-changes --log-file=$log_file --backup --backup-dir=$backup_dir ---delete  --archive $PRIVATE_HOST:$repository  $repository
 
-    repository='/home/archivi/share/'
-    log_file="$LOG_ROOT/$ts.share"
-    echo
-    echo "Trasferimento $repository ($ts)"
-    rsync $DRY_RUN --backup --itemize-changes --log-file=$log_file --archive --verbose $repository   $PRIVATE_HOST:$repository
-    rsync $DRY_RUN --backup --itemize-changes --log-file=$log_file --archive --verbose $PRIVATE_HOST:$repository   $repository
+#     repository='/home/archivi/share/'
+#     log_file="$LOG_ROOT/$ts.share"
+#     echo
+#     echo "Trasferimento $repository ($ts)"
+#     rsync $DRY_RUN --backup --itemize-changes --log-file=$log_file --archive --verbose $repository   $PRIVATE_HOST:$repository
+#     rsync $DRY_RUN --backup --itemize-changes --log-file=$log_file --archive --verbose $PRIVATE_HOST:$repository   $repository
 
-    additional_notice
-}
+#     additional_notice
+# }
 
 work_to_disk() {
 
@@ -187,16 +185,16 @@ work_to_disk() {
     #
     #   - WORK archive:  HOST ---> USB   (delete)
     #
-    #   - PRIVATE archive:      USB ---> HOST  (delete)
+    #   - PRIVATE archive:      USB ---> HOST  (delete) (some objects only)
     #
 
-    rsync -av $DRY_RUN /home/archivi/share/  /mnt/seagate/archivi/share/
-
-    rsync -av $DRY_RUN /mnt/seagate/archivi/share/  /home/archivi/share/
+    rsync -av $DRY_RUN /mnt/seagate/archivi/share/  /home/archivi/share.in/ && \
+        rsync -av $DRY_RUN --delete /home/archivi/share.out/  /mnt/seagate/archivi/share/
 
     rsync -av --delete $DRY_RUN  /home/archivi/office/  /mnt/seagate/archivi/office/
 
-    rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/home/      /home/archivi/home/
+    rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/home/var/biblioteca/        /home/archivi/home/var/biblioteca/
+
 
 }
 
@@ -261,23 +259,23 @@ remove_disk() {
 cmd=$1
 case $cmd in
 
-    #
-    # Eseguito su host di lavoro, collegato in rete con host privato.
-    #
-    work-to-private)
+    # #
+    # # Eseguito su host di lavoro, collegato in rete con host privato.
+    # #
+    # work-to-private)
 
-        if [ "$host" == "$WORK_HOST" ]; then
-            if ping $PRIVATE_HOST -c2; then
-                work_to_private
-                exit $EXIT_SUCCESS
-            else
-                echo "Host $PRIVATE_HOST non raggiungibile;  elaborazione annullata."
-            fi
-        else
-            echo "Questo comando dev'essere eseguito in $WORK_HOST; elaborazione annullata."
-            exit $INVALID_EXECUTION_HOST
-        fi
-        ;;
+    #     if [ "$host" == "$WORK_HOST" ]; then
+    #         if ping $PRIVATE_HOST -c2; then
+    #             work_to_private
+    #             exit $EXIT_SUCCESS
+    #         else
+    #             echo "Host $PRIVATE_HOST non raggiungibile;  elaborazione annullata."
+    #         fi
+    #     else
+    #         echo "Questo comando dev'essere eseguito in $WORK_HOST; elaborazione annullata."
+    #         exit $INVALID_EXECUTION_HOST
+    #     fi
+    #     ;;
 
     #
     # Eseguito su host di lavoro, collegato in USB con disco esterno.
