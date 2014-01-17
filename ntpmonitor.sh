@@ -95,6 +95,6 @@ if ps -C ntpd > /dev/null ; then
     fi
 else
     echo 'ntpd is not running; why?'
-    grep 'peers refreshed' /var/log/messages | tail -1
-    start_ntpd
+    grep 'peers refreshed' /var/log/messages | tail
+    update_clock
 fi
