@@ -1,17 +1,18 @@
 #!/bin/sh
 #
-# $Id: archivi_sync,v 1.9 2013/11/17 22:05:28 tnx Exp $
-#
+# repo https://github.com/nellinux/sysadmin
 
 APP_NAME=`basename $0 .sh | sed 's/.*\///'`
-LOG_ROOT='/var/log/archivi_sync'
-BACKUP_ROOT='/home/archivi.sync_backup'
+LOG_ROOT='TBD'    #'/var/log/archivi_sync'
+BACKUP_ROOT='TBD' #'/home/archivi.sync_backup'
 WORK_HOST='ls0001.direzione.lombardia.dipvvf.it'
 PRIVATE_HOST='k.nellinux.net'
 DISK_ID='0bc2:2332'
 DISK_MOUNT='/mnt/seagate'
 DISK_DEV='/dev/seagate'
 MAPNAME='cryptoseagate'
+
+
 
 log(){
     echo "[$APP_NAME `date +%T`] $1"
@@ -49,9 +50,6 @@ OPZIONI:
      -h  questo help
      -V  stampa le informazioni di versione del programma
 
-POLICY SINCRONIZZAZIONE:
-    tbd
-
 EOF
   exit 1
 }
@@ -71,7 +69,8 @@ NOOP=0
 INVALID_EXECUTION_HOST=1
 FUNCTION_TO_BE_DEFINED=2
 DISK_NOT_AVAILABLE=3
-
+DIRECTORY_NOT_WRITABLE=4
+DEVICE_NOT_AVAILABLE=5
 
 #
 # Gestione dei parametri e delle opzioni
@@ -99,7 +98,7 @@ host=`cat /etc/HOSTNAME`
 ts=`date +%Y%m%d%H%M%S`
 
 #
-# Funzioni che devono stre qui in quanto hanno bisogno di accedere ai
+# Funzioni che devono stare qui in quanto hanno bisogno di accedere ai
 # valori di alcune variabili di modulo e costanti.
 #
 
@@ -112,70 +111,29 @@ EOF
     fi
 }
 
-# work_to_private() {
+dir_is_writable() {
+    d=$1
+    if [ ! -w "$d" ]; then
+        log "$d non esiste o non è permesso scrivervi."
+        exit $DIRECTORY_NOT_WRITABLE
+    fi
+}
 
-#     #------------------------------------------------------------------#
-#     #                                                                  #
-#     # Con questa elaborazione  si sincronizzano gli oggetti tra i due  #
-#     # calcolatori collegati tramite rete;  il programm va eseguito nel #
-#     # calcolatore dell'ufficio (es. ls001).                             #
-#     #                                                                  #
-#     #------------------------------------------------------------------#
+are_objects_available() {
+    dir_is_writable /home/archivi/home/
+    dir_is_writable /home/archivi/home/var/biblioteca/
+    dir_is_writable /home/archivi/office/
+    dir_is_writable /home/archivi/share.in/
+    dir_is_writable /home/archivi/share.out/
+    dir_is_writable /mnt/seagate/archivi/home/
+    dir_is_writable /mnt/seagate/archivi/home/var/biblioteca/
+    dir_is_writable /mnt/seagate/archivi/office/
+    dir_is_writable /mnt/seagate/archivi/share.to_private/
+    dir_is_writable /mnt/seagate/archivi/share.to_work/
+}
 
-#     #
-#     # Controllo prerequisiti
-#     #
-
-#     # Posizione di backup locale
-#     if [ ! -w "$BACKUP_ROOT" ]; then
-#         echo "La posizione $BACKUP_ROOT non e' disponibile per la scrittura.  Elaborazione interrotta."
-#         echo "# su -c " "'" "mkdir $BACKUP_ROOT" "&& chown tnx $BACKUP_ROOT'"
-#         exit -1
-#     fi
-#     # Posizione di backup remota
-#     if ! ssh $PRIVATE_HOST "test -w $BACKUP_ROOT"; then
-#         echo "La posizione $PRIVATE_HOST:$BACKUP_ROOT non e' disponibile per la scrittura.  Elaborazione interrotta."
-#         echo "# ssh root@$PRIVATE_HOST 'mkdir $BACKUP_ROOT && chown tnx $BACKUP_ROOT'"
-#         exit -2
-#     fi
-#     # Posizione log
-#     if [ ! -w "$LOG_ROOT" ]; then
-#         echo "La posizione $LOG_ROOT non e' disponibile per la scrittura.  Elaborazione interrotta."
-#         echo "# su -c " "'" "mkdir $LOG_ROOT" "&& chown tnx $LOG_ROOT'"
-#         exit -3
-#     fi
-
-#     #
-#     # Trasferimenti
-#     #
-
-#     repository='/home/archivi/office/'
-#     backup_dir="$BACKUP_ROOT/$ts/office/"
-#     log_file="$LOG_ROOT/$ts.office"
-#     echo
-#     echo "Trasferimento $repository da locale a $PRIVATE_HOST ($ts)"
-#     rsync $DRY_RUN  --itemize-changes --log-file=$log_file --backup --backup-dir=$backup_dir ---delete  --archive $repository  $PRIVATE_HOST:$repository
-
-#     repository='/home/archivi/home/'
-#     backup_dir="$BACKUP_ROOT/$ts/home/"
-#     log_file="$LOG_ROOT/$ts.home"
-#     echo
-#     echo "Trasferimento $repository da $PRIVATE_HOST a locale ($ts)"
-#     rsync $DRY_RUN --itemize-changes --log-file=$log_file --backup --backup-dir=$backup_dir ---delete  --archive $PRIVATE_HOST:$repository  $repository
-
-#     repository='/home/archivi/share/'
-#     log_file="$LOG_ROOT/$ts.share"
-#     echo
-#     echo "Trasferimento $repository ($ts)"
-#     rsync $DRY_RUN --backup --itemize-changes --log-file=$log_file --archive --verbose $repository   $PRIVATE_HOST:$repository
-#     rsync $DRY_RUN --backup --itemize-changes --log-file=$log_file --archive --verbose $PRIVATE_HOST:$repository   $repository
-
-#     additional_notice
-# }
 
 work_to_disk() {
-
-    echo "A minimal implementation !! The bigger is coming ... :-)"
 
     # Aggiornamento tramite HOST LAVORO collegato a disco
     #
@@ -188,20 +146,30 @@ work_to_disk() {
     #   - PRIVATE archive:      USB ---> HOST  (delete) (some objects only)
     #
 
-    rsync -av $DRY_RUN /mnt/seagate/archivi/share/  /home/archivi/share.in/ && \
-        rsync -av $DRY_RUN --delete /home/archivi/share.out/  /mnt/seagate/archivi/share/
 
-    rsync -av --delete $DRY_RUN  /home/archivi/office/  /mnt/seagate/archivi/office/
+    log 'Work -> USB'
 
-    rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/home/var/biblioteca/        /home/archivi/home/var/biblioteca/
+    if are_objects_available; then
 
+        log 'Shared files moving'
+        if  [ "$DRY_RUN" == '' ]; then
+            mv  /mnt/seagate/archivi/share.to_work/*  /home/archivi/share.in/                 > /dev/null 2>&1
+            mv  /home/archivi/share.out/*             /mnt/seagate/archivi/share.to_private/  > /dev/null 2>&1
+            ls -l /home/archivi/share.in/
+        fi
 
+        log 'Work files syncing'
+        rsync -av --delete $DRY_RUN  /home/archivi/office/  /mnt/seagate/archivi/office/
+
+        log 'Private files syncing'
+        rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/home/var/biblioteca/   /home/archivi/home/var/biblioteca/
+    fi
 }
 
 
 private_to_disk() {
 
-    echo "A minimal implementation !! The bigger is coming ... :-)"
+    log 'Private <-> USB'
 
     # Aggiornamento tramite HOST PRIVATO collegato a disco
     #
@@ -214,42 +182,51 @@ private_to_disk() {
     #   - WORK archive:      USB ---> HOST  (delete)
     #
 
-    rsync -av $DRY_RUN /mnt/seagate/archivi/share/  /home/archivi/share.in/ && \
-        rsync -av $DRY_RUN --delete /home/archivi/share.out/  /mnt/seagate/archivi/share/
+    if are_objects_available; then
 
-    rsync -av --delete $DRY_RUN  /home/archivi/home/      /mnt/seagate/archivi/home/
+        log 'Shared files moving'
+        if  [ "$DRY_RUN" == '' ]; then
+            mv  /mnt/seagate/archivi/share.to_private/*  /home/archivi/share.in/                > /dev/null 2>&1
+            mv  /home/archivi/share.out/*                /mnt/seagate/archivi/share.to_work/    > /dev/null 2>&1
+            ls -l /home/archivi/share.in/
+        fi
 
-    rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/office/  /home/archivi/office/
+        log 'Private files syncing'
+        rsync -av --delete $DRY_RUN  /home/archivi/home/      /mnt/seagate/archivi/home/
 
+        log 'Work files syncing'
+        rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/office/  /home/archivi/office/
+    fi
 }
 
 
 mount_disk() {
+
     if lsusb | grep $DISK_ID; then
         if mount | grep $DISK_MOUNT;then
             return 0
         else
-            cryptsetup -d /etc/enc-key create $MAPNAME $DISK_DEV && mount $DISK_MOUNT
+            if [ -x "$DISK_DEV" ]; then
+                mkdir -p $DISK_MOUNT
+                cryptsetup -d /etc/enc-key create $MAPNAME $DISK_DEV && mount $DISK_MOUNT
+            else
+                echo "Il device $DISK_DEV non è disponibile."
+                return $DEVICE_NOT_AVAILABLE
+            fi
         fi
     else
-        echo "Il disco non e' collegato"
+        echo "Il disco non e' collegato."
         return $DISK_NOT_AVAILABLE
     fi
 }
 
 remove_disk() {
-    if mount | grep $DISK_MOUNT;then
+    if mount | grep $DISK_MOUNT > /dev/null;then
+        echo "Rimozione di $DISK_MOUNT"
         umount $DISK_MOUNT && cryptsetup remove $MAPNAME
     fi
 }
 
-#
-#
-#  INSERIRE I CONTROLLI SULLA DISPONIBILITA' DEGLI OGGETT IDI SISTEMA
-#
-#  (/mnt/seagate, etc...)
-#
-#
 
 
 #
@@ -257,24 +234,6 @@ remove_disk() {
 #
 cmd=$1
 case $cmd in
-
-    # #
-    # # Eseguito su host di lavoro, collegato in rete con host privato.
-    # #
-    # work-to-private)
-
-    #     if [ "$host" == "$WORK_HOST" ]; then
-    #         if ping $PRIVATE_HOST -c2; then
-    #             work_to_private
-    #             exit $EXIT_SUCCESS
-    #         else
-    #             echo "Host $PRIVATE_HOST non raggiungibile;  elaborazione annullata."
-    #         fi
-    #     else
-    #         echo "Questo comando dev'essere eseguito in $WORK_HOST; elaborazione annullata."
-    #         exit $INVALID_EXECUTION_HOST
-    #     fi
-    #     ;;
 
     #
     # Eseguito su host di lavoro, collegato in USB con disco esterno.
@@ -316,8 +275,7 @@ case $cmd in
     # Gestione dispositivo
     #
     mount)
-        mount_disk
-        echo $DISK_MOUNT
+        mount_disk && echo "Dispositivo accessibile in $DISK_MOUNT."
         ;;
 
     remove)
