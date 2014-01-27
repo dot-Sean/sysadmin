@@ -7,6 +7,11 @@
 # 2014 Jan 25 - nellinux@rocketmail.com
 
 #
+# Constants
+# 
+FONT='-*-utopia-regular-r-*-*-*-240-*-*-*-180-*-*'
+
+#
 # Dependencies
 #
 
@@ -41,4 +46,4 @@ wsname=$(xprop -root _NET_CURRENT_DESKTOP \
 #
 pkill -9 -U `id -u` osd_cat  2>&1 > /dev/null
 get_ws_name
-echo $wsname | osd_cat -c yellow -f -*-*-medium-r-*-*-*-200-*-*-*-*-*-*
+echo $wsname | osd_cat -c yellow -f $FONT
