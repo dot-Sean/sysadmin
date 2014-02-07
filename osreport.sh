@@ -11,16 +11,8 @@ export DISPLAY=":0"
 
 duration=10
 
-font=-*-terminus-medium-*-*-*-*-140-*-*-*-*-*-*
+font=-*-terminus-medium-*-*-*-*-180-*-*-*-*-*-*
 
 pkill -9 -U `id -u` osd_cat  2>&1 > /dev/null
 
-date | osd_cat -d $duration -l5 -c yellow -f $font &
-
-
-
-#
-# This do noto work !
-#
-# mutt -Z  || echo  'No mail' | osd_cat -d $duration -f $font -c blue -o13
-#
+date | osd_cat --delay $duration --lines 2 -c yellow --font $font --pos=bottom &
