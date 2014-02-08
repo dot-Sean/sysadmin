@@ -16,7 +16,7 @@ MAPNAME='cryptoseagate'
 
 log(){
     echo "[$APP_NAME `date +%T`] $1"
-    logger $1 -t $APP_NAME
+    logger  --tag $APP_NAME -- $1
 }
 
 
@@ -147,9 +147,16 @@ work_to_disk() {
     #
 
 
-    log 'Work -> USB'
+    log 'Work <-> USB'
 
     if are_objects_available; then
+
+        log 'Work files syncing'
+        rsync -av --delete $DRY_RUN  /home/archivi/office/  /mnt/seagate/archivi/office/
+
+        log 'Private files syncing'
+        rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/home/var/git/   /home/archivi/home/var/git/
+        rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/home/var/biblioteca/   /home/archivi/home/var/biblioteca/
 
         log 'Shared files moving'
         if  [ "$DRY_RUN" == '' ]; then
@@ -158,12 +165,6 @@ work_to_disk() {
             ls -l /home/archivi/share.in/
         fi
 
-        log 'Work files syncing'
-        rsync -av --delete $DRY_RUN  /home/archivi/office/  /mnt/seagate/archivi/office/
-
-        log 'Private files syncing'
-        rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/home/var/git/   /home/archivi/home/var/git/
-        rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/home/var/biblioteca/   /home/archivi/home/var/biblioteca/
     fi
 }
 
@@ -185,6 +186,12 @@ private_to_disk() {
 
     if are_objects_available; then
 
+        log 'Private files syncing'
+        rsync -av --delete $DRY_RUN  /home/archivi/home/      /mnt/seagate/archivi/home/
+
+        log 'Work files syncing'
+        rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/office/  /home/archivi/office/
+
         log 'Shared files moving'
         if  [ "$DRY_RUN" == '' ]; then
             mv  /mnt/seagate/archivi/share.to_private/*  /home/archivi/share.in/                > /dev/null 2>&1
@@ -192,11 +199,6 @@ private_to_disk() {
             ls -l /home/archivi/share.in/
         fi
 
-        log 'Private files syncing'
-        rsync -av --delete $DRY_RUN  /home/archivi/home/      /mnt/seagate/archivi/home/
-
-        log 'Work files syncing'
-        rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/office/  /home/archivi/office/
     fi
 }
 
