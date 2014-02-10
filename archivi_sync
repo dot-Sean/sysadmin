@@ -155,7 +155,8 @@ work_to_disk() {
         rsync -av --delete $DRY_RUN  /home/archivi/office/  /mnt/seagate/archivi/office/
 
         log 'Private files syncing'
-        rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/home/var/git/   /home/archivi/home/var/git/
+        rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/home/doc/kb/           /home/archivi/home/doc/kb/
+        rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/home/var/git/          /home/archivi/home/var/git/
         rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/home/var/biblioteca/   /home/archivi/home/var/biblioteca/
 
         log 'Shared files moving'
