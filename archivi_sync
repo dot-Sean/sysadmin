@@ -121,6 +121,7 @@ dir_is_writable() {
 
 are_objects_available() {
     dir_is_writable /home/archivi/home/
+    dir_is_writable /home/archivi/home/doc/kb/
     dir_is_writable /home/archivi/home/var/biblioteca/
     dir_is_writable /home/archivi/office/
     dir_is_writable /home/archivi/share.in/
