@@ -123,6 +123,7 @@ are_objects_available() {
     dir_is_writable /home/archivi/home/
     dir_is_writable /home/archivi/home/doc/kb/
     dir_is_writable /home/archivi/home/var/biblioteca/
+    dir_is_writable /home/archivi/home/var/current/
     dir_is_writable /home/archivi/office/
     dir_is_writable /home/archivi/share.in/
     dir_is_writable /home/archivi/share.out/
@@ -159,6 +160,7 @@ work_to_disk() {
         rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/home/doc/kb/           /home/archivi/home/doc/kb/
         rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/home/var/git/          /home/archivi/home/var/git/
         rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/home/var/biblioteca/   /home/archivi/home/var/biblioteca/
+        rsync -av --delete $DRY_RUN  /mnt/seagate/archivi/home/var/current/      /home/archivi/home/var/current/
 
         log 'Shared files moving'
         if  [ "$DRY_RUN" == '' ]; then
