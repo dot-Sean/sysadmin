@@ -1,0 +1,141 @@
+#!/bin/sh
+#
+# ssh_pub_key_export
+#
+# Inspired by sshsudo (http://code.google.com/p/sshsudo/)
+#
+#
+
+
+EXIT_SUCCESS=0
+MISSED_ARG=1
+WRONG_ARG=2
+MISSED_DEP=3
+NOOP=0
+
+APP_NAME=($basename $0)
+
+
+depends_on(){
+    deps=$(cat <<EOV
+      ssh
+      sshpass
+    EOV
+    )
+
+    for d in $deps; do
+        if type $d >& /dev/null; then
+            echo  "This program depends on $d; please install it."
+            exit $MISSED_DEP
+        fi
+    done
+}
+
+log() {
+    echo "[$APP_NAME `date +%T`] $1"
+    logger "$1" -t $APP_NAME
+}
+
+usage() {
+cat <<EOF
+NAME
+       ssh_pub_key_export - inject account of remote host with user public SSH key
+
+SYNOPSIS
+       ls [OPTION]... HOST  [KEY_FILE]
+
+DESCRIPTION
+       Read the public SSH key of current user and add it into the  SSH
+       authorized_keys file in a remote host.
+
+       If user have not the account on remote host, make it.
+
+       Default KEY_FILE is ~/.ssh/id_rsa.pub
+
+       -h   display this help and exit
+
+       -U   =LOGIN
+
+       -v   increase verbosity
+EOF
+}
+
+work_in_progress() {
+cat <<EOF
+$(basename $0)
+Function not yet implemented :-)
+EOF
+}
+
+#### MAIN ###
+
+while getopts ":hvU:" option; do
+  case $option in
+      h)  usage
+          exit $EXIT_SUCCESS
+          ;;
+      U)  user_login=$OPTARG
+          ;;
+      v)  verbose='y'
+          ;;
+  esac
+done
+
+shift $(($OPTIND - 1))
+
+
+#
+# Arguments ?
+#
+
+if [ -n "$1" ];then
+    host=$1
+else
+    echo 'You must specify the hostname.' > /dev/stderr
+    exit $MISSED_ARG
+fi
+
+if [ -n "$2" ]; then
+    if [ -r "$2" ]; then
+        keyfile=$2
+    else
+        echo "Key file '$2' not found or not readable." > /dev/stderr
+        exit $WRONG_ARG
+    fi
+else
+    keyfile="/home/$USER/.ssh/id_rsa.pub"
+fi
+
+[ "$user_login" == "" ] && user_login=$USER
+
+[ "$verbose" == 'y' ]  &&  log "User login is '$user_login'"
+[ "$verbose" == 'y' ]  &&  log "Host is $host"
+[ "$verbose" == 'y' ]  &&  log "Key in in $keyfile"
+
+
+
+#
+# Script to execute on remote host
+#
+
+key=$(cat $keyfile)
+remote_commands=$(cat <<EOV
+grep "^$user_login" /etc/passwd || useradd -m $user_login
+mkdir -p /home/$user_login/.ssh
+echo $key >> /home/$user_login/.ssh/authorized_keys
+chown $user_login  /home/$user_login/.ssh/  -R
+chmod 700  /home/$user_login/.ssh/
+chmod 600  /home/$user_login/.ssh/authorized_keys
+EOV
+)
+
+[ "$verbose" == 'y' ]  &&  log "Remote commands: $remote_commands"
+
+depends_on
+
+#
+# Fire Up !
+#
+read -s -p "Please enter your password:" password
+echo
+sshpass ssh -p password root@$host "$remote_commands"
