@@ -17,18 +17,17 @@ APP_NAME=($basename $0)
 
 
 depends_on(){
-    deps=$(cat <<EOV
-      ssh
-      sshpass
-    EOV
-    )
-
-    for d in $deps; do
-        if type $d >& /dev/null; then
-            echo  "This program depends on $d; please install it."
-            exit $MISSED_DEP
-        fi
-    done
+deps=$(cat <<EOV
+ssh
+sshpass
+EOV
+)
+for d in $deps; do
+    if ! type $d >& /dev/null; then
+        echo  "This program depends on $d; please install it."
+        exit $MISSED_DEP
+    fi
+done
 }
 
 log() {
@@ -136,6 +135,6 @@ depends_on
 #
 # Fire Up !
 #
-read -s -p "Please enter your password:" password
+read -s -p "Please enter root@$host password:" password
 echo
-sshpass ssh -p password root@$host "$remote_commands"
+sshpass -p $password ssh  root@$host "$remote_commands"
