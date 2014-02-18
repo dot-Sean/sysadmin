@@ -107,10 +107,14 @@ fi
 
 [ "$user_login" == "" ] && user_login=$USER
 
-[ "$verbose" == 'y' ]  &&  log "User login is '$user_login'"
-[ "$verbose" == 'y' ]  &&  log "Host is $host"
-[ "$verbose" == 'y' ]  &&  log "Key in in $keyfile"
-
+#
+# Some informations
+#
+if [ "$verbose" == 'y' ]; then
+    log "User login is '$user_login'"
+    log "Host is $host"
+    log "Key in in $keyfile"
+fi
 
 
 #
