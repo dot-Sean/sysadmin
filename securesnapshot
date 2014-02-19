@@ -1,0 +1,68 @@
+#!/bin/sh
+#
+# $Id: securesnapshot,v 1.2 2012/12/01 08:01:46 tnx Exp $
+#
+# Programma per la gestione dei backup mediante disco rimovibile
+# cifrato.
+#
+# Rif. Linux&C #75 del novembre 2011.
+
+DEVICE='/dev/rsnapshot'
+PARTITION='/mnt/rsnapshot'
+KEY='/etc/seagate-enc-key'
+MAPNAME='cryptobackup'
+
+#
+# Monto la partizione se il device cifrato è disponibile
+#
+if [ "$1" == "mount" ]; then
+
+    if mount | grep $PARTITION > /dev/null; then
+        exit 0
+    fi
+
+    if [ -r $DEVICE ]; then
+        echo Mounting ...
+        cryptsetup -d $KEY create $MAPNAME  $DEVICE
+
+        if [ ! -x $PARTITION ]; then
+            mkdir $PARTITION
+            echo "Created $PARTITION"
+        fi
+
+        if `mount /mnt/rsnapshot`; then
+            echo "$DEVICE mounted on $PARTITION"
+        else
+            echo "Unable to mount $DEVICE on $PARTITION"
+        fi
+    else
+        echo "The device $DEVICE is not available; please connect the hardware."
+    fi
+fi
+
+#
+# Smonto la partizione
+#
+if [ "$1" == "unmount" ]; then
+    echo Unmounting ...
+    umount $PARTITION
+    cryptsetup remove cryptobackup
+fi
+
+#
+# Mostro la guida
+#
+if [ "$1" == "help" ] ||  [ "$1" == "" ] ; then
+cat <<EOF
+Usage: securesnapshot COMMAND
+
+COMMANDS
+
+  help     mostra questa guida
+  mount    rende disponibile la partizione cifrata
+  unmount  scollega la partizione cifrata
+
+EOF
+fi
+
+exit 0
