@@ -1,0 +1,180 @@
+#!/bin/sh
+#
+# repo https://github.com/nellinux/sysadmin
+
+APP_NAME=`basename $0 .sh | sed 's/.*\///'`
+LOG_ROOT='TBD'    #'/var/log/archivi_sync'
+BACKUP_ROOT='TBD' #'/home/archivi.sync_backup'
+
+CONTAINER_2='/Volumes/2TBWDSILVER/STORAGE2TBSILVER'
+CONTAINER_1='/Users/giovanni/STORAGEMAC'
+
+
+SERVER_NAME='192.168.1.131'
+SERVER_STORAGE='/var/storage'
+
+
+# WORK_HOST='ls0001.direzione.lombardia.dipvvf.it'
+# PRIVATE_HOST='k.nellinux.net'
+# DISK_ID='0bc2:2332'
+# DISK_MOUNT='/mnt/seagate'
+# DISK_DEV='/dev/seagate'
+# MAPNAME='cryptoseagate'
+
+
+
+log(){
+    echo "[$APP_NAME `date +%T`] $1"
+    logger  -tag $APP_NAME -- $1
+}
+
+
+version() {
+  v=$(cat $0 | sed -n /^#.*Id:/p )
+  echo $v | sed  's/.*Id://'
+}
+
+
+usage() {
+cat <<EOF
+NOME: $APP_NAME
+
+SINOSSI: $APP_NAME [OPZIONI] COMANDO
+
+DESCRIZIONE:
+
+     Il programma $APP_NAME sincronizza oggetti del Mac con il server
+     di backup.
+
+COMANDI:
+
+     mac-to-server   :  eseguito nel Mac, esegue il backup sul server
+
+
+OPZIONI:
+     -n  dry run
+     -h  questo help
+     -V  stampa le informazioni di versione del programma
+
+EOF
+  exit 1
+}
+
+work_in_progress() {
+cat <<EOF
+$(basename $0)
+Questa funzionalita' non e' disponibile :-)
+EOF
+
+}
+
+#### MAIN ###
+
+EXIT_SUCCESS=0
+NOOP=0
+INVALID_EXECUTION_HOST=1
+FUNCTION_TO_BE_DEFINED=2
+DISK_NOT_AVAILABLE=3
+DIRECTORY_NOT_WRITABLE=4
+DIRECTORY_NOT_READABLE=6
+DEVICE_NOT_AVAILABLE=5
+
+#
+# Gestione dei parametri e delle opzioni
+#
+while getopts ":nhV" option; do
+  case $option in
+      n)  DRY_RUN='--dry-run'
+          ;;
+      h)  usage
+          exit $EXIT_SUCCESS
+          ;;
+      V)  version
+          exit $EXIT_SUCCESS
+          ;;
+  esac
+done
+
+shift $(($OPTIND - 1))
+
+#
+# Variabili di modulo
+#
+
+ts=`date +%Y%m%d%H%M%S`
+
+#
+# Funzioni che devono stare qui in quanto hanno bisogno di accedere ai
+# valori di alcune variabili di modulo e costanti.
+#
+
+additional_notice() {
+    if [ "$DRY_RUN" != "--dry-run" ]; then
+        cat <<EOF
+** TBD **
+EOF
+    fi
+}
+
+dir_is_writable() {
+    d=$1
+    if [ ! -w "$d" ]; then
+        log "$d non esiste o non ? permesso scrivervi."
+        exit $DIRECTORY_NOT_WRITABLE
+    fi
+}
+
+dir_is_readable() {
+    d=$1
+    if [ ! -x "$d" ]; then
+        log "$d non esiste o non e' permesso accedervi."
+    fi
+}
+
+are_objects_readable() {
+    dir_is_readable $CONTAINER_1
+    dir_is_readable $CONTAINER_2
+}
+
+
+mac_to_server() {
+
+    log 'Mac to server sync ...'
+
+    are_objects_readable
+
+    for container in $CONTAINER_1 $CONTAINER_2; do
+
+        log "Syncing $container to server ... "
+
+if [ -x "$container" ]; then
+    dest_dir=$(basename $container)
+    echo "rsync -av --delete $DRY_RUN  $container/  giovanni@
+$SERVER_NAME:$SERVER_STORAGE/$dest_dir/"
+            rsync -av --delete $DRY_RUN  $container/  giovanni@
+$SERVER_NAME:$SERVER_STORAGE/$dest_dir/
+else
+    log "$container non sincronizzata."
+fi
+
+    done
+}
+
+
+
+
+#
+# Ciclo dei comandi
+#
+cmd=$1
+case $cmd in
+
+    mac-to-server)
+
+mac_to_server
+        ;;
+
+    *) usage
+        exit $EXIT_SUCCESS
+        ;;
+esac
