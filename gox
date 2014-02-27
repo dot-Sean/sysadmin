@@ -1,0 +1,48 @@
+#!/bin/sh
+#
+# Avvio  sistema grafico, ssh-agent e partizioni cifrate.
+#
+
+
+
+#
+# Main
+#
+
+if [ "$USER" == 'root' ]; then
+    SUDO=''
+else
+    SUDO=sudo
+fi
+
+if  [ "$1" == "remove" ]; then
+    echo 'Removing object'
+    $SUDO /sbin/umount /home || exit
+    $SUDO /usr/sbin/cryptsetup remove slacker
+    exit
+else
+
+    if ! mount | grep '/home'; then
+
+	echo 'Autenticazione:'
+
+	if $SUDO /usr/sbin/cryptsetup  create -y slacker /dev/sda4; then
+	    echo 'Avvio del sistema grafico'
+	    $SUDO /sbin/mount /home || exit
+	else
+	    echo  'Riprova !'
+	    exit
+	fi
+    fi
+
+    echo 'Avvio sistema grafico'
+
+    if [ "$USER" == 'root' ]; then
+	su -c startx tnx
+    else
+#	export DISPLAY=:0.0
+	export HOME=/home/tnx
+	xhost +
+	ssh-agent startx &
+    fi
+fi
