@@ -1,6 +1,7 @@
 #!/bin/sh
 #
-# template.sh
+#  Sync $ALWAYS_AVALAIBLE_MAILDIR with $OFFLINE_ARCHIVE_MAILDIR
+#  Tipically used in cron job.
 #
 
 ALWAYS_AVALAIBLE_MAILDIR='/home/tnx/.posta-ricevuta/'
