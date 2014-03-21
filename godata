@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# nellinux, 2013-11-22
+#
+
+COMMAND='cryptsetup create --verify-passphrase archivi /dev/sda5 && mount /dev/mapper/archivi /home/archivi/'
+
+if [ "$USER" == 'root' ]; then
+    $COMMAND
+else
+    su -c "$COMMAND"
+fi
