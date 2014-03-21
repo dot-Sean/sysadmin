@@ -1,0 +1,69 @@
+#!/bin/sh
+#
+# template.sh
+#
+
+ALWAYS_AVALAIBLE_MAILDIR='/home/tnx/.posta-ricevuta/'
+OFFLINE_ARCHIVE_MAILDIR='/home/tnx/.mt/ricevuta/'
+
+EXIT_SUCCESS=0
+NOOP=0
+SOURCE_NOT_AVAILABLE=-1
+DEST_NOT_AVAILABLE=-2
+
+
+APP_NAME=($basename $0)
+
+log() {
+    echo "[$APP_NAME `date +%T`] $1"
+    logger $1 -t $APP_NAME
+}
+
+usage() {
+cat <<EOF
+  USAGE:
+    $(basename $0) [OPTIONS]
+
+  OPTIONS:
+    -h  THIS HELP
+
+  Sync $ALWAYS_AVALAIBLE_MAILDIR with $OFFLINE_ARCHIVE_MAILDIR
+  Tipically used in cron job.
+
+EOF
+}
+
+work_in_progress() {
+cat <<EOF
+$(basename $0)
+Function not yet implemented :-)
+EOF
+}
+
+#### MAIN ###
+
+while getopts ":h" option; do
+  case $option in
+      h)  usage
+          exit $EXIT_SUCCESS
+          ;;
+  esac
+done
+
+shift $(($OPTIND - 1))
+
+if [ ! -r  $ALWAYS_AVALAIBLE_MAILDIR ]; then
+
+    log "[EE]  $ALWAYS_AVALAIBLE_MAILDIR no available"
+    exit $SOURCE_NOT_AVAILABLE
+
+else
+    if [ -w $OFFLINE_ARCHIVE_MAILDIR ]; then
+        rsync -av $ALWAYS_AVALAIBLE_MAILDIR $OFFLINE_ARCHIVE_MAILDIR
+    else
+        log "[WW]  $OFFLINE_ARCHIVE_MAILDIR not available"
+        exit $DEST_NOT_AVAILABLE
+    fi
+fi
+
+exit $EXIT_SUCCESS
