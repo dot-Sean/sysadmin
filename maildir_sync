@@ -5,6 +5,7 @@
 
 ALWAYS_AVALAIBLE_MAILDIR='/home/tnx/.posta-ricevuta/'
 OFFLINE_ARCHIVE_MAILDIR='/home/tnx/.mt/ricevuta/'
+WARNING_RCPT='tnx'
 
 EXIT_SUCCESS=0
 NOOP=0
@@ -33,6 +34,10 @@ cat <<EOF
 EOF
 }
 
+mail_send() {
+    echo $1 | mail -s "$APP_NAME - warning" $WARNING_RCPT
+}
+
 work_in_progress() {
 cat <<EOF
 $(basename $0)
@@ -54,14 +59,18 @@ shift $(($OPTIND - 1))
 
 if [ ! -r  $ALWAYS_AVALAIBLE_MAILDIR ]; then
 
-    log "[EE]  $ALWAYS_AVALAIBLE_MAILDIR no available"
+    msg="[EE]  $ALWAYS_AVALAIBLE_MAILDIR not available (ALWAYS_AVALAIBLE_MAILDIR)"
+    log "$msg"
+    mail_send "$msg"
     exit $SOURCE_NOT_AVAILABLE
 
 else
     if [ -w $OFFLINE_ARCHIVE_MAILDIR ]; then
         rsync -av $ALWAYS_AVALAIBLE_MAILDIR $OFFLINE_ARCHIVE_MAILDIR
     else
-        log "[WW]  $OFFLINE_ARCHIVE_MAILDIR not available"
+        msg="[WW]  $OFFLINE_ARCHIVE_MAILDIR not available (OFFLINE_ARCHIVE_MAILDIR)"
+        log "$msg"
+        mail_send "$msg"
         exit $DEST_NOT_AVAILABLE
     fi
 fi
