@@ -10,17 +10,8 @@ CONTAINER_2='/Volumes/2TBWDSILVER/STORAGE2TBSILVER'
 CONTAINER_1='/Users/giovanni/STORAGEMAC'
 
 
-SERVER_NAME='192.168.1.131'
+SERVER_NAME='192.168.1.100'   # eth1
 SERVER_STORAGE='/var/storage'
-
-
-# WORK_HOST='ls0001.direzione.lombardia.dipvvf.it'
-# PRIVATE_HOST='k.nellinux.net'
-# DISK_ID='0bc2:2332'
-# DISK_MOUNT='/mnt/seagate'
-# DISK_DEV='/dev/seagate'
-# MAPNAME='cryptoseagate'
-
 
 
 log(){
@@ -147,14 +138,12 @@ mac_to_server() {
 
         log "Syncing $container to server ... "
 
-if [ -x "$container" ]; then
+if [ -w "$container" ]; then
     dest_dir=$(basename $container)
-    echo "rsync -av --delete $DRY_RUN  $container/  giovanni@
-$SERVER_NAME:$SERVER_STORAGE/$dest_dir/"
-            rsync -av --delete $DRY_RUN  $container/  giovanni@
-$SERVER_NAME:$SERVER_STORAGE/$dest_dir/
+    echo "rsync -av --delete $DRY_RUN  $container/  giovanni@$SERVER_NAME:$SERVER_STORAGE/$dest_dir/"
+            rsync -av --delete $DRY_RUN  $container/  giovanni@$SERVER_NAME:$SERVER_STORAGE/$dest_dir/
 else
-    log "$container non sincronizzata."
+    log "$container non sincronizzata (non accessibile in scrittura o non esistente)"
 fi
 
     done
@@ -170,8 +159,7 @@ cmd=$1
 case $cmd in
 
     mac-to-server)
-
-mac_to_server
+        mac_to_server
         ;;
 
     *) usage
