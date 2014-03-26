@@ -3,10 +3,12 @@
 # nellinux, 2013-11-22
 #
 
-COMMAND='cryptsetup create --verify-passphrase archivi /dev/sda5 && mount /dev/mapper/archivi /home/archivi/'
+
 
 if [ "$USER" == 'root' ]; then
-    $COMMAND
+    SUDO=""
 else
-    su -c "$COMMAND"
+    SUDO="/usr/bin/sudo"
 fi
+
+$SUDO /sbin/cryptsetup create --verify-passphrase archivi /dev/sda5 && $SUDO /sbin/mount /dev/mapper/archivi /home/archivi/
