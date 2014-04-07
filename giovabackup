@@ -6,7 +6,7 @@
 #  Costanti
 #
 
-VERSION='Tue Apr 1 2014 / 01'
+VERSION='Tue Apr 7 2014'
 
 CMDLINE="$0 $@"
 
