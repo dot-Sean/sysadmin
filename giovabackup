@@ -2,9 +2,18 @@
 #
 # repo https://github.com/nellinux/sysadmin
 
+#
+#  Costanti
+#
+
+VERSION='Tue Apr 1 2014 / 01'
+
+CMDLINE="$0 $@"
+
 APP_NAME=`basename $0 .sh | sed 's/.*\///'`
-LOG_ROOT='TBD'    #'/var/log/archivi_sync'
-BACKUP_ROOT='TBD' #'/home/archivi.sync_backup'
+
+LOG_DIR="$HOME/giovabackup.log"
+LOG_FILE_BASE='giovabackup'
 
 CONTAINER_2='/Volumes/2TBWDSILVER/STORAGE2TBSILVER'
 CONTAINER_1='/Users/giovanni/STORAGEMAC'
@@ -14,19 +23,42 @@ SERVER_NAME='192.168.1.100'   # eth1
 SERVER_STORAGE='/var/storage'
 
 
+#
+# Variabili di modulo
+#
+
+ts=`date +%Y%m%d%H%M%S`
+log_file=$LOG_DIR/$LOG_FILE_BASE          #.$(date +%Y%d%m%H%M%S)
+
+
+#
+# Funzioni
+#
+
 log(){
-    echo "[$APP_NAME `date +%T`] $1"
-    logger  -tag $APP_NAME -- $1
+    [ "$VERBOSE" == "--verbose" ] && echo "[$APP_NAME `date +%T`] $1"
+    echo "[$APP_NAME `date +%T`] $1" >> $log_file
 }
 
 
-version() {
-  v=$(cat $0 | sed -n /^#.*Id:/p )
-  echo $v | sed  's/.*Id://'
+print_env(){
+  cat <<EOF
+Costanti utilizzate nel programma:
+  CONTAINER_1 = $CONTAINER_1
+  CONTAINER_2 = $CONTAINER_2
+  LOG_DIR = $LOG_DIR
+  LOG_FILE_BASE = $LOG_FILE_BASE
+  SERVER_NAME = $SERVER_NAME
+  SERVER_STORAGE = $SERVER_STORAGE
+EOF
+}
+
+version(){
+    echo $VERSION
 }
 
 
-usage() {
+usage(){
 cat <<EOF
 NOME: $APP_NAME
 
@@ -45,6 +77,7 @@ COMANDI:
 OPZIONI:
      -n  dry run
      -h  questo help
+     -v  modo prolisso
      -V  stampa le informazioni di versione del programma
 
 EOF
@@ -73,14 +106,20 @@ DEVICE_NOT_AVAILABLE=5
 #
 # Gestione dei parametri e delle opzioni
 #
-while getopts ":nhV" option; do
+while getopts ":nhVv" option; do
   case $option in
       n)  DRY_RUN='--dry-run'
           ;;
+
       h)  usage
           exit $EXIT_SUCCESS
           ;;
+
+      v)  VERBOSE='--verbose'
+          ;;
+
       V)  version
+          print_env
           exit $EXIT_SUCCESS
           ;;
   esac
@@ -88,11 +127,7 @@ done
 
 shift $(($OPTIND - 1))
 
-#
-# Variabili di modulo
-#
 
-ts=`date +%Y%m%d%H%M%S`
 
 #
 # Funzioni che devono stare qui in quanto hanno bisogno di accedere ai
@@ -110,7 +145,7 @@ EOF
 dir_is_writable() {
     d=$1
     if [ ! -w "$d" ]; then
-        log "$d non esiste o non ? permesso scrivervi."
+        echo "$d non esiste o non e' permesso scrivervi."
         exit $DIRECTORY_NOT_WRITABLE
     fi
 }
@@ -118,7 +153,7 @@ dir_is_writable() {
 dir_is_readable() {
     d=$1
     if [ ! -x "$d" ]; then
-        log "$d non esiste o non e' permesso accedervi."
+        echo "$d non esiste o non e' permesso accedervi."
     fi
 }
 
@@ -140,8 +175,8 @@ mac_to_server() {
 
 if [ -w "$container" ]; then
     dest_dir=$(basename $container)
-    echo "rsync -av --delete $DRY_RUN  $container/  giovanni@$SERVER_NAME:$SERVER_STORAGE/$dest_dir/"
-            rsync -av --delete $DRY_RUN  $container/  giovanni@$SERVER_NAME:$SERVER_STORAGE/$dest_dir/
+    echo "rsync -a $VERBOSE --itemize-changes --log-file=$log_file --delete $DRY_RUN  $container/  giovanni@$SERVER_NAME:$SERVER_STORAGE/$dest_dir/"
+          rsync -a $VERBOSE --itemize-changes --log-file=$log_file --delete $DRY_RUN  $container/  giovanni@$SERVER_NAME:$SERVER_STORAGE/$dest_dir/
 else
     log "$container non sincronizzata (non accessibile in scrittura o non esistente)"
 fi
@@ -151,6 +186,11 @@ fi
 
 
 
+#
+# Init
+#
+mkdir -p "$LOG_DIR"
+log "Start as \"$CMDLINE\" from `pwd`"
 
 #
 # Ciclo dei comandi
@@ -162,7 +202,9 @@ case $cmd in
         mac_to_server
         ;;
 
-    *) usage
+    *)  usage
         exit $EXIT_SUCCESS
         ;;
 esac
+
+exit 0
