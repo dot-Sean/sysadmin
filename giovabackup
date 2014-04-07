@@ -18,10 +18,9 @@ LOG_FILE_BASE='giovabackup'
 CONTAINER_2='/Volumes/2TBWDSILVER/STORAGE2TBSILVER'
 CONTAINER_1='/Users/giovanni/STORAGEMAC'
 
-
 SERVER_NAME='192.168.1.100'   # eth1
 SERVER_STORAGE='/var/storage'
-
+SERVER_LOGIN='giovanni'
 
 #
 # Variabili di modulo
@@ -50,6 +49,7 @@ Costanti utilizzate nel programma:
   LOG_FILE_BASE = $LOG_FILE_BASE
   SERVER_NAME = $SERVER_NAME
   SERVER_STORAGE = $SERVER_STORAGE
+  SERVER_LOGIN= $SERVER_LOGIN
 EOF
 }
 
@@ -102,6 +102,9 @@ DISK_NOT_AVAILABLE=3
 DIRECTORY_NOT_WRITABLE=4
 DIRECTORY_NOT_READABLE=6
 DEVICE_NOT_AVAILABLE=5
+SERVER_NOT_AVAILABLE=6
+SERVER_STORAGE_NOT_AVAILABLE=7
+SERVER_RSYNC_NOT_AVAILABLE=8
 
 #
 # Gestione dei parametri e delle opzioni
@@ -162,25 +165,47 @@ are_objects_readable() {
     dir_is_readable $CONTAINER_2
 }
 
+is_remote_not_available(){
+
+    if ! ssh $SERVER_LOGIN@$SERVER_NAME which rsync > /dev/null; then
+	echo "rsync in $SERVER_NAME non esiste o non e' permesso accedervi."
+	exit $SERVER_RSYNC_NOT_AVAILABLE
+    fi
+
+    if ! ping -n -c2 $SERVER_NAME > /dev/null; then
+        echo "Il server $SERVER_NAME non e' disponibile."
+	exit $SERVER_NOT_AVAILABLE
+    fi
+
+    if ! ssh $SERVER_LOGIN@$SERVER_NAME test -w $SERVER_STORAGE; then
+	echo "$SERVER_STORAGE in $SERVER_NAME non esiste o non e' permesso accedervi."
+	exit $SERVER_STORAGE_NOT_AVAILABLE
+    fi
+}
+
 
 mac_to_server() {
 
     log 'Mac to server sync ...'
 
+    is_remote_not_available
     are_objects_readable
 
     for container in $CONTAINER_1 $CONTAINER_2; do
 
         log "Syncing $container to server ... "
 
-if [ -w "$container" ]; then
-    dest_dir=$(basename $container)
-    echo "rsync -a $VERBOSE --itemize-changes --log-file=$log_file --delete $DRY_RUN  $container/  giovanni@$SERVER_NAME:$SERVER_STORAGE/$dest_dir/"
-          rsync -a $VERBOSE --itemize-changes --log-file=$log_file --delete $DRY_RUN  $container/  giovanni@$SERVER_NAME:$SERVER_STORAGE/$dest_dir/
-else
-    log "$container non sincronizzata (non accessibile in scrittura o non esistente)"
-fi
-
+	if [ -w "$container" ]; then
+	    dest_dir=$(basename $container)
+	    if ssh $SERVER_LOGIN@$SERVER_NAME 'test -w' $SERVER_STORAGE/$dest_dir/ ; then
+		[ "$VERBOSE" == "--verbose" ] && echo "rsync -a $VERBOSE  --log-file=$log_file --delete $DRY_RUN  $container/  $SERVER_LOGIN@$SERVER_NAME:$SERVER_STORAGE/$dest_dir/"
+		rsync -a $VERBOSE  --log-file=$log_file --delete $DRY_RUN  $container/  $SERVER_LOGIN@$SERVER_NAME:$SERVER_STORAGE/$dest_dir/
+	    else
+		log "$container non sincronizzata ($SERVER_STORAGE/$dest_dir/ non accessibile in scrittura o non esistente in $SERVER_NAME)"		
+	    fi
+	else
+	    log "$container non sincronizzata (non accessibile in scrittura o non esistente in locale)"
+	fi
     done
 }
 
