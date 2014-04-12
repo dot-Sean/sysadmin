@@ -1,6 +1,8 @@
 #!/bin/sh
 #
 # repo https://github.com/nellinux/sysadmin
+# wget https://raw.githubusercontent.com/nellinux/sysadmin/master/giovabackup
+#
 
 #
 #  Costanti
