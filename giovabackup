@@ -8,7 +8,7 @@
 #  Costanti
 #
 
-VERSION='Tue Apr 7 2014 - rev. 1'
+VERSION='Tue Apr 13 2014'
 
 CMDLINE="$0 $@"
 
@@ -183,7 +183,7 @@ is_remote_not_available(){
         exit $SERVER_NOT_AVAILABLE
     fi
 
-    if ! ssh $SERVER_LOGIN@$SERVER_NAME test -w $SERVER_STORAGE; then
+    if ! ssh $SERVER_LOGIN@$SERVER_NAME test -x $SERVER_STORAGE; then
         echo "$SERVER_STORAGE in $SERVER_NAME non esiste o non e' permesso accedervi."
         exit $SERVER_STORAGE_NOT_AVAILABLE
     fi
