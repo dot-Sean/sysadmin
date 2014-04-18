@@ -41,7 +41,7 @@ NAME
        ssh_pub_key_export - inject account of remote host with user public SSH key
 
 SYNOPSIS
-       ls [OPTION]... HOST  [KEY_FILE]
+       ssh_pub_key_export [OPTION]... HOST  [KEY_FILE]
 
 DESCRIPTION
        Read the public SSH key of current user and add it into the  SSH
