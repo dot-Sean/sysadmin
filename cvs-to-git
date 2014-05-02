@@ -1,0 +1,161 @@
+#!/bin/sh
+#
+# cvs-to-git
+#
+# nellinux@rocketmail.com
+#
+
+###############################################################################
+# Constants                                                                   #
+###############################################################################
+
+EXIT_SUCCESS=0
+NOOP=0
+APP_NAME=($basename $0)
+
+START_TIME=$(date +%s%N)
+
+
+###############################################################################
+# Configs                                                                     #
+###############################################################################
+
+CVS2SVN_URL='http://cvs2svn.tigris.org/files/documents/1462/49237/cvs2svn-2.4.0.tar.gz'
+BIN_NAME='cvs2git'
+
+APPLICATION_DIR='/tmp/cvs-to-git.application'
+WORKING_DIR="/tmp/cvs-to-git.working-area.$START_TIME"
+TEMP_DIR="$WORKING_DIR/temp"
+BIN_DIR="$WORKING_DIR/bin"
+BIN_PATH="$BIN_DIR/$BIN_NAME"
+TARBALL='tarball.tar.gz'
+
+USER_ID="$USER@$(hostname)"
+
+BLOBFILE="$WORKING_DIR/cvs2svn-tmp/git-blob.dat"
+DUMPFILE="$WORKING_DIR/cvs2svn-tmp/git-dump.dat"
+
+###############################################################################
+# Exit codes                                                                  #
+###############################################################################
+
+ABORT_DUE_TO_DOWNLOAD_APPLICATION=1
+ABORT_DUE_TO_MAKING_WORKING_AREA=2
+ABORT_DUE_TO_LINKING_APPLICATION=3
+
+###############################################################################
+# Functions                                                                   #
+###############################################################################
+
+function cleanup {
+    [ "$debug_mode"  ==  "t" ] || rm -fR  $WORKING_DIR
+}
+
+function application_download {
+    if [ ! -x "$APPLICATION_DIR/$BIN_NAME" ]; then
+	cd $TEMP_DIR
+    	log "Downloading cvs2svn ..."
+	if ! wget --quiet --output-document -   $CVS2SVN_URL > $TARBALL  ; then
+	    echo "Unrecoverable error while downloading $CVS2SVN_URL; aborting."
+	    exit $ABORT_DUE_TO_DOWNLOAD_APPLICATION
+	fi
+	tar -xzf $TARBALL
+	rm  $TARBALL
+	mv cvs2svn-* $APPLICATION_DIR
+    fi
+} 
+
+function application_setup {
+    application_download
+    ln -s $APPLICATION_DIR/$BIN_NAME $BIN_DIR/
+    if [ ! -x "$BIN_PATH" ]; then
+	echo "Unrecoverable error while linking  $BIN_PATH to $APPLICATION_DIR/$BIN_NAME; aborting."
+	exit $ABORT_DUE_TO_LINKING_APPLICATION
+    fi
+}
+
+function is_cvs_repo_valid {
+    test -x "$1"
+}
+
+function export_cvs_repo {
+    cd $WORKING_DIR
+    $BIN_PATH --encoding=latin1 \
+	--username=$USER_ID     \
+        --blobfile=$BLOBFILE    \
+	--dumpfile=$DUMPFILE    \
+	$CVS_REPO_FILE	
+}
+function make_working_area {
+    if ! mkdir -p $WORKING_DIR $TEMP_DIR $BIN_DIR; then
+	echo "Unrecoverable error while making working area; aborting."
+	exit $ABORT_DUE_TO_MAKING_WORKING_AREA
+    fi
+}
+
+function log {
+    [ "$debug_mode"  ==  "t" ] &&  echo "$1"
+}
+
+function usage {
+cat <<EOF
+
+NAME
+	$APP_NAME - Convert a CVS repo with projects to GIT repositories
+
+SYNOPSIS
+	$APP_NAME CVS_REPOSITORY
+
+DESCRIPTION
+
+	$APP_NAME exports projects stored into the CVS_REPOSITORY in single bare Git repositories.
+
+OPTIONS
+	-d  debug
+	-h  prints the synopsis
+EOF
+}
+
+###############################################################################
+# Get Opts                                                                    #
+###############################################################################
+
+while getopts ":hd" option; do
+  case $option in
+      d)  debug_mode='t'
+	  log "Debug mode enabled"
+          ;;
+      h)  usage
+          exit $EXIT_SUCCESS
+          ;;
+  esac
+done
+
+shift $(($OPTIND - 1))
+
+
+
+###############################################################################
+# MAIN                                                                        #
+###############################################################################
+
+#
+# Argomenti
+#
+
+cvs_repo=$1
+
+if is_cvs_repo_valid $cvs_repo ; then
+
+    make_working_area
+
+    application_setup
+
+    cvs_repo_file="$WORKING_DIR/$"
+
+    cleanup
+
+else
+    echo "CVS repository not valid ($cvs_repo)"
+fi
+
