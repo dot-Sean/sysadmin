@@ -12,7 +12,7 @@
 EXIT_SUCCESS=0
 NOOP=0
 APP_NAME=($basename $0)
-
+EXEC_DIR=$(pwd)
 START_TIME=$(date +%s%N)
 
 
@@ -20,20 +20,34 @@ START_TIME=$(date +%s%N)
 # Configs                                                                     #
 ###############################################################################
 
+CVS_ENCODING='latin1'
 CVS2SVN_URL='http://cvs2svn.tigris.org/files/documents/1462/49237/cvs2svn-2.4.0.tar.gz'
 BIN_NAME='cvs2git'
 
-APPLICATION_DIR='/tmp/cvs-to-git.application'
 WORKING_DIR="/tmp/cvs-to-git.working-area.$START_TIME"
+
+LOGFILE="$WORKING_DIR/log"
+
+EMERGENCY_GIT_STORAGE_DIR="/tmp/cvs-to-git-storage.$START_TIME.git"
+
 TEMP_DIR="$WORKING_DIR/temp"
+
+GIT_BIGREPO_DIR="$TEMP_DIR/bigrepo.git"
+GIT_BIGCLONE_DIR="$TEMP_DIR/bigrepo"
+GIT_PROJECTS_REPOS="$TEMP_DIR/projects.gits"
+
+APPLICATION_DIR='/tmp/cvs-to-git.application'
 BIN_DIR="$WORKING_DIR/bin"
 BIN_PATH="$BIN_DIR/$BIN_NAME"
+
 TARBALL='tarball.tar.gz'
 
 USER_ID="$USER@$(hostname)"
 
-BLOBFILE="$WORKING_DIR/cvs2svn-tmp/git-blob.dat"
-DUMPFILE="$WORKING_DIR/cvs2svn-tmp/git-dump.dat"
+BLOBDIR="$WORKING_DIR/cvs2svn-tmp"
+BLOBFILE="$BLOBDIR/git-blob.dat"
+DUMPDIR="$WORKING_DIR/cvs2svn-tmp"
+DUMPFILE="$DUMPDIR/git-dump.dat"
 
 ###############################################################################
 # Exit codes                                                                  #
@@ -42,16 +56,40 @@ DUMPFILE="$WORKING_DIR/cvs2svn-tmp/git-dump.dat"
 ABORT_DUE_TO_DOWNLOAD_APPLICATION=1
 ABORT_DUE_TO_MAKING_WORKING_AREA=2
 ABORT_DUE_TO_LINKING_APPLICATION=3
+ABORT_DUE_TO_COPYING_GIT_PROJECTS=4
 
 ###############################################################################
 # Functions                                                                   #
 ###############################################################################
 
-function cleanup {
+function delete_temps {
+    # Clean temporary data, unless in debug run mode
+    #
     [ "$debug_mode"  ==  "t" ] || rm -fR  $WORKING_DIR
 }
 
+function clean_up {
+    log "** Call $FUNCNAME()"
+
+    user_storage=$1
+    git_storage=${user_storage:-$EMERGENCY_GIT_STORAGE_DIR}
+
+    # Export Git repos for projects into the storage
+    # and remove temporary objects.
+    # 
+    log "*** Copy git projects into $git_storage"
+    cd $EXEC_DIR
+    if cp -a $GIT_PROJECTS_REPOS $git_storage; then
+	cp $LOGFILE  $git_storage/cvs-to-git.export.log
+	delete_temps
+    else
+        echo "Unrecoverable error while copying $GIT_PROJECTS_REPOS in $git_storage; all git repository are created in temporary directory $GIT_PROJECTS_REPOS/."
+    fi
+    [ "$verbose_mode" == 't' ] && echo "Git projects and log file are in $git_storage/"
+}
+
 function application_download {
+    log "** Call $FUNCNAME()"
     if [ ! -x "$APPLICATION_DIR/$BIN_NAME" ]; then
 	cd $TEMP_DIR
     	log "Downloading cvs2svn ..."
@@ -63,38 +101,99 @@ function application_download {
 	rm  $TARBALL
 	mv cvs2svn-* $APPLICATION_DIR
     fi
+    log "** End $FUNCNAME()"
 } 
 
 function application_setup {
+    log "** Call $FUNCNAME()"
     application_download
     ln -s $APPLICATION_DIR/$BIN_NAME $BIN_DIR/
     if [ ! -x "$BIN_PATH" ]; then
 	echo "Unrecoverable error while linking  $BIN_PATH to $APPLICATION_DIR/$BIN_NAME; aborting."
 	exit $ABORT_DUE_TO_LINKING_APPLICATION
     fi
+    log "** End $FUNCNAME()"
 }
 
 function is_cvs_repo_valid {
-    test -x "$1"
+    test -x "$1/CVSROOT/"
 }
 
 function export_cvs_repo {
-    cd $WORKING_DIR
-    $BIN_PATH --encoding=latin1 \
+    log "** Call $FUNCNAME()"
+    # export CVS repo
+    # 
+    cvs_repo=$1
+    mkdir -p $BLOBDIR $DUMPDIR
+
+    $BIN_PATH  --encoding=$CVS_ENCODING \
 	--username=$USER_ID     \
         --blobfile=$BLOBFILE    \
 	--dumpfile=$DUMPFILE    \
-	$CVS_REPO_FILE	
+	$cvs_repo >> $LOGFILE
+
+    # Import into a monoliting Git repo
+    # 
+    log "*** Import CVS to monolitic Git repo"
+    mkdir -p $GIT_BIGREPO_DIR
+    cd $GIT_BIGREPO_DIR
+    git init --bare >> $LOGFILE
+    cat $BLOBFILE $DUMPFILE | git fast-import --quiet  >> $LOGFILE
+
+    # Clone the  monoliting Git repo
+    # 
+    log "*** Clone the monolitic Git repo"
+    git clone $GIT_BIGREPO_DIR $GIT_BIGCLONE_DIR  >> $LOGFILE
+    cd $GIT_BIGCLONE_DIR
+    git remote rm origin  >> $LOGFILE
+
+    log "** End $FUNCNAME()"
 }
+
+function  exported_cvs_repos_list {
+    ls $GIT_BIGCLONE_DIR | sed '/CVSROOT/d'
+}
+
+function make_git_projects_repos {
+    log "** Call $FUNCNAME()"
+    
+    projects=$(exported_cvs_repos_list)
+    log "The projects to gittify are:"
+    log "$projects"
+ 
+    working_area=$TEMP_DIR/git_temp_working_area
+    for project in $projects; do
+
+	# Copy the big clone to filter
+	# 
+	rm -fR  $working_area
+        cp -a $GIT_BIGCLONE_DIR $working_area
+	cd $working_area
+
+	# Filter project
+	# 
+	project_git_repo=$GIT_PROJECTS_REPOS/$project.git
+	log "*** Filter $project and make $project_git_repo"
+    	git filter-branch --force --subdirectory-filter $project -- --all >> $LOGFILE 2>&1
+	git init --bare $project_git_repo  >> $LOGFILE 2>&1
+	git remote add origin  $project_git_repo  >> $LOGFILE 2>&1
+	git push --set-upstream origin master  >> $LOGFILE 2>&1
+    done
+    log "** End $FUNCNAME()"
+}
+
 function make_working_area {
     if ! mkdir -p $WORKING_DIR $TEMP_DIR $BIN_DIR; then
 	echo "Unrecoverable error while making working area; aborting."
 	exit $ABORT_DUE_TO_MAKING_WORKING_AREA
     fi
+ 
+    init_log_file
 }
 
 function log {
     [ "$debug_mode"  ==  "t" ] &&  echo "$1"
+    echo "$1"  >> $LOGFILE
 }
 
 function usage {
@@ -104,15 +203,48 @@ NAME
 	$APP_NAME - Convert a CVS repo with projects to GIT repositories
 
 SYNOPSIS
-	$APP_NAME CVS_REPOSITORY
+	$APP_NAME CVS_REPOSITORY GIT_STORAGE
 
 DESCRIPTION
 
-	$APP_NAME exports projects stored into the CVS_REPOSITORY in single bare Git repositories.
+	$APP_NAME exports projects stored into the CVS_REPOSITORY in single bare Git repositories;  the latter are copied into the GIT_STORAGE.
 
 OPTIONS
-	-d  debug
+	-d  debug mode
 	-h  prints the synopsis
+	-v  verbose mode
+
+SEE ALSO
+	http://www.mcs.anl.gov/~jacob/cvs2svn/cvs2git.html
+        git fast-import --help
+	http://stackoverflow.com/questions/17413493/create-a-submodule-repository-from-a-folder-and-keep-its-git-commit-history
+EOF
+}
+
+function init_log_file {
+cat >> $LOGFILE <<EOF
+$APP_NAME run log
+$(date)
+APPLICATION_DIR = $APPLICATION_DIR
+BIN_DIR = $BIN_DIR
+BIN_NAME = $BIN_NAME
+BIN_PATH = $BIN_PATH
+BLOBDIR = $BLOBDIR
+BLOBFILE = $BLOBFILE
+CVS2SVN_URL = $CVS2SVN_URL
+CVS_ENCODING = $CVS_ENCODING
+DUMPDIR = $DUMPDIR
+DUMPFILE = $DUMPFILE
+EMERGENCY_GIT_STORAGE_DIR = $EMERGENCY_GIT_STORAGE_DIR
+GIT_BIGCLONE_DIR = $GIT_BIGCLONE_DIR
+GIT_BIGREPO_DIR = $GIT_BIGREPO_DIR
+GIT_PROJECTS_REPOS = $GIT_PROJECTS_REPOS
+LOGFILE = $LOGFILE
+TARBALL = $TARBALL
+TEMP_DIR = $TEMP_DIR
+USER_ID = $USER_ID
+WORKING_DIR = $WORKING_DIR
+
 EOF
 }
 
@@ -120,14 +252,16 @@ EOF
 # Get Opts                                                                    #
 ###############################################################################
 
-while getopts ":hd" option; do
+while getopts ":dhv" option; do
   case $option in
       d)  debug_mode='t'
-	  log "Debug mode enabled"
+	  echo "Debug mode enabled"
           ;;
       h)  usage
           exit $EXIT_SUCCESS
           ;;
+      v)  verbose_mode='t'
+	  ;;
   esac
 done
 
@@ -139,11 +273,8 @@ shift $(($OPTIND - 1))
 # MAIN                                                                        #
 ###############################################################################
 
-#
-# Argomenti
-#
-
 cvs_repo=$1
+git_storage=$2
 
 if is_cvs_repo_valid $cvs_repo ; then
 
@@ -151,9 +282,11 @@ if is_cvs_repo_valid $cvs_repo ; then
 
     application_setup
 
-    cvs_repo_file="$WORKING_DIR/$"
+    export_cvs_repo $cvs_repo
 
-    cleanup
+    make_git_projects_repos
+    
+    clean_up $git_storage
 
 else
     echo "CVS repository not valid ($cvs_repo)"
